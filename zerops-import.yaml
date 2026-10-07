@@ -24,6 +24,10 @@ services:
     maxContainers: 1
     envSecrets:
       API_SERVER_KEY: <@generateRandomString(<48>)>
+      # Cloudflare R2: replace the three REPLACE_* values before importing (or edit later in the GUI)
+      RCLONE_CONFIG_R2_ENDPOINT: https://REPLACE_ACCOUNT_ID.r2.cloudflarestorage.com
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: REPLACE_R2_ACCESS_KEY_ID
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: REPLACE_R2_SECRET_ACCESS_KEY
     verticalAutoscaling:
       minRam: 0.5
       maxRam: 2
