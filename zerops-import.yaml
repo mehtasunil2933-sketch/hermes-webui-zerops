@@ -1,0 +1,52 @@
+#yamlPreprocessor=on
+# Import this as a NEW project (Zerops dashboard -> Import a project).
+# Region EU Central (prg1) works well; core package Lightweight; ZCP off.
+project:
+  name: hermes-webui
+  description: Hermes Agent gateway + Hermes WebUI on one Local Storage volume
+  corePackage: LIGHT
+  tags:
+    - hermes
+
+services:
+  # Brand-new volume, separate from any previous Hermes project.
+  - hostname: vol
+    type: local-storage:single@1
+    priority: 10
+
+  # Hermes Agent gateway (Telegram etc, cron, API server on 8642). The ONLY writer.
+  - hostname: hermes
+    type: python@3.11
+    priority: 5
+    buildFromGit: https://github.com/mehtasunil2933-sketch/hermes-webui-zerops
+    zeropsSetup: hermes
+    minContainers: 1
+    maxContainers: 1
+    envSecrets:
+      API_SERVER_KEY: <@generateRandomString(<48>)>
+    verticalAutoscaling:
+      minRam: 0.5
+      maxRam: 2
+      minFreeRamGB: 0.25
+      minCpu: 1
+      maxCpu: 4
+      minDisk: 5
+
+  # Hermes WebUI, separate service. Chat runs on the gateway through the private network.
+  - hostname: webui
+    type: python@3.11
+    priority: 4
+    buildFromGit: https://github.com/mehtasunil2933-sketch/hermes-webui-zerops
+    zeropsSetup: webui
+    enableSubdomainAccess: true
+    minContainers: 1
+    maxContainers: 1
+    envSecrets:
+      HERMES_WEBUI_PASSWORD: <@generateRandomString(<32>)>
+    verticalAutoscaling:
+      minRam: 0.5
+      maxRam: 2
+      minFreeRamGB: 0.25
+      minCpu: 1
+      maxCpu: 4
+      minDisk: 5

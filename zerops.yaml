@@ -1,0 +1,85 @@
+zerops:
+  # ---------------------------------------------------------------- gateway
+  - setup: hermes
+    build:
+      base: python@3.11
+      os: ubuntu
+      buildCommands:
+        - echo "nothing to build; hermes-agent is installed in run.prepareCommands"
+      deployFiles:
+        - scripts
+    run:
+      base: python@3.11
+      os: ubuntu
+      prepareCommands:
+        - sudo apt-get update
+        - sudo apt-get install -y curl sqlite3 ripgrep git unzip rclone
+        # [messaging] provides aiohttp (API server on 8642) and python-telegram-bot
+        - pip install --no-cache-dir "hermes-agent[messaging,cron]==0.19.0"
+      volume:
+        hostname: vol
+        mountPath: /mnt/vol
+      envVariables:
+        HERMES_HOME: /mnt/vol/hermes
+        HERMES_WRITE_SAFE_ROOT: /mnt/vol/hermes
+        API_SERVER_ENABLED: "true"
+        API_SERVER_HOST: 0.0.0.0
+        MALLOC_ARENA_MAX: "2"
+      initCommands:
+        - mkdir -p /mnt/vol/hermes /mnt/vol/workspace /mnt/vol/backup
+        - touch /mnt/vol/hermes/.env
+      start: bash /var/www/scripts/start-hermes.sh
+      ports:
+        - port: 8642
+          httpSupport: true
+      crontab:
+        - command: bash /var/www/scripts/backup.sh db
+          timing: "30 * * * *"
+          allContainers: false
+        - command: bash /var/www/scripts/backup.sh offsite
+          timing: "45 3 * * *"
+          allContainers: false
+
+  # ------------------------------------------------------------------ webui
+  - setup: webui
+    build:
+      base: python@3.11
+      os: ubuntu
+      buildCommands:
+        - curl -fsSL https://github.com/nesquena/hermes-webui/archive/refs/tags/v0.52.113.tar.gz | tar xz
+        - mv hermes-webui-0.52.113 webui
+        - rm -rf webui/tests webui/docs
+      deployFiles:
+        - webui
+        - scripts
+    run:
+      base: python@3.11
+      os: ubuntu
+      prepareCommands:
+        - sudo apt-get update
+        - sudo apt-get install -y curl
+        # WebUI imports run_agent / reads HERMES_HOME, so it needs the same agent version
+        - pip install --no-cache-dir hermes-agent==0.19.0
+      volume:
+        hostname: vol
+        mountPath: /mnt/vol
+      envVariables:
+        HERMES_HOME: /mnt/vol/hermes
+        HERMES_WRITE_SAFE_ROOT: /mnt/vol/hermes
+        HERMES_WEBUI_CHAT_BACKEND: gateway
+        HERMES_WEBUI_GATEWAY_BASE_URL: http://hermes:8642
+        HERMES_WEBUI_GATEWAY_USE_RUNS_API: "true"
+        HERMES_WEBUI_GATEWAY_API_KEY: ${hermes_API_SERVER_KEY}
+        HERMES_API_URL: http://hermes:8642
+        HERMES_WEBUI_AGENT_CACHE_MAX: "5"
+        MALLOC_ARENA_MAX: "2"
+      initCommands:
+        - mkdir -p /mnt/vol/hermes /mnt/vol/workspace
+      start: bash /var/www/scripts/start-webui.sh
+      ports:
+        - port: 8787
+          httpSupport: true
+      healthCheck:
+        httpGet:
+          port: 8787
+          path: /health
